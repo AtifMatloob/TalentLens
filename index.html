@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="TalentLens — AI-powered candidate ranking system that understands who truly fits the role, beyond keyword matching.">
+    <title>TalentLens — AI Candidate Intelligence</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="src/styles/index.css">
+    <link rel="stylesheet" href="src/styles/components.css">
+    <link rel="stylesheet" href="src/styles/animations.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Ambient Background -->
+        <div class="ambient-bg">
+            <div class="ambient-orb ambient-orb--1"></div>
+            <div class="ambient-orb ambient-orb--2"></div>
+            <div class="ambient-orb ambient-orb--3"></div>
+        </div>
+
+        <!-- Header -->
+        <header class="header" id="header">
+            <div class="header__logo">
+                <div class="header__logo-icon">
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                        <circle cx="14" cy="14" r="12" stroke="url(#logo-grad)" stroke-width="2.5"/>
+                        <circle cx="14" cy="14" r="5" fill="url(#logo-grad)"/>
+                        <path d="M14 2 L14 6 M14 22 L14 26 M2 14 L6 14 M22 14 L26 14" stroke="url(#logo-grad)" stroke-width="2" stroke-linecap="round"/>
+                        <defs>
+                            <linearGradient id="logo-grad" x1="0" y1="0" x2="28" y2="28">
+                                <stop offset="0%" stop-color="#818CF8"/>
+                                <stop offset="100%" stop-color="#EC4899"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <span class="header__logo-text">TalentLens</span>
+            </div>
+            <nav class="header__nav" id="main-nav">
+                <button class="header__nav-btn active" data-view="input" id="nav-input">
+                    <span class="header__nav-icon">📝</span> Configure
+                </button>
+                <button class="header__nav-btn" data-view="results" id="nav-results" disabled>
+                    <span class="header__nav-icon">🎯</span> Rankings
+                </button>
+                <button class="header__nav-btn" data-view="compare" id="nav-compare" disabled>
+                    <span class="header__nav-icon">⚖️</span> Compare
+                </button>
+                <button class="header__nav-btn" data-view="insights" id="nav-insights" disabled>
+                    <span class="header__nav-icon">💡</span> Insights
+                </button>
+            </nav>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="main" id="main-content">
+            <!-- View: JD Input -->
+            <section class="view view--active" id="view-input">
+                <div class="view__container">
+                    <div class="input-hero">
+                        <h1 class="input-hero__title">
+                            Find talent that <span class="gradient-text">truly fits</span>
+                        </h1>
+                        <p class="input-hero__subtitle">
+                            Paste a job description and let our AI engine understand what the role actually needs — 
+                            then surface candidates who genuinely match, not just keyword hits.
+                        </p>
+                    </div>
+
+                    <div class="input-grid">
+                        <!-- JD Input Panel -->
+                        <div class="glass-card input-panel" id="jd-input-panel">
+                            <div class="card-header">
+                                <h2 class="card-header__title">Job Description</h2>
+                                <div class="card-header__actions">
+                                    <div class="dropdown" id="template-dropdown">
+                                        <button class="btn btn--ghost btn--sm" id="template-btn">
+                                            <span>📋</span> Use Template
+                                        </button>
+                                        <div class="dropdown__menu" id="template-menu"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <textarea 
+                                class="jd-textarea" 
+                                id="jd-textarea" 
+                                placeholder="Paste the full job description here...&#10;&#10;Example: We're looking for a Senior Full-Stack Engineer with 5+ years of experience building scalable web applications. The ideal candidate has deep expertise in React, Node.js, and cloud infrastructure (AWS/GCP). Experience with microservices architecture and CI/CD pipelines is essential..."
+                                spellcheck="false"
+                            ></textarea>
+                            <div class="jd-textarea__footer">
+                                <span class="jd-textarea__count" id="jd-char-count">0 characters</span>
+                            </div>
+                        </div>
+
+                        <!-- Configuration Panel -->
+                        <div class="config-panel">
+                            <!-- Parsed Requirements Preview -->
+                            <div class="glass-card config-section" id="parsed-preview">
+                                <div class="card-header">
+                                    <h2 class="card-header__title">AI-Parsed Requirements</h2>
+                                    <span class="badge badge--info" id="parse-status">Waiting for input</span>
+                                </div>
+                                <div class="parsed-content" id="parsed-content">
+                                    <div class="parsed-empty">
+                                        <span class="parsed-empty__icon">🧠</span>
+                                        <p>Enter a job description to see AI-parsed requirements</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Weight Configuration -->
+                            <div class="glass-card config-section" id="weight-config">
+                                <div class="card-header">
+                                    <h2 class="card-header__title">Scoring Weights</h2>
+                                    <button class="btn btn--ghost btn--sm" id="reset-weights-btn">Reset</button>
+                                </div>
+                                <div class="weight-sliders" id="weight-sliders">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+
+                            <!-- Action -->
+                            <button class="btn btn--primary btn--lg btn--full" id="analyze-btn" disabled>
+                                <span class="btn__icon">🚀</span>
+                                <span class="btn__text">Analyze & Rank Candidates</span>
+                                <div class="btn__loader" id="analyze-loader"></div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- View: Results / Rankings -->
+            <section class="view" id="view-results">
+                <div class="view__container">
+                    <div class="results-header">
+                        <div class="results-header__info">
+                            <h1 class="results-header__title">Candidate Rankings</h1>
+                            <p class="results-header__subtitle" id="results-subtitle"></p>
+                        </div>
+                        <div class="results-header__actions">
+                            <div class="search-box" id="candidate-search-box">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                                <input type="text" class="search-box__input" id="candidate-search" placeholder="Search candidates...">
+                            </div>
+                            <button class="btn btn--ghost btn--sm" id="back-to-input-btn">
+                                ← Modify Search
+                            </button>
+                        </div>
+                    </div>
+                    <div class="results-grid" id="results-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- View: Compare -->
+            <section class="view" id="view-compare">
+                <div class="view__container">
+                    <div class="compare-header">
+                        <h1 class="compare-header__title">Side-by-Side Comparison</h1>
+                        <button class="btn btn--ghost btn--sm" id="back-to-results-btn">← Back to Rankings</button>
+                    </div>
+                    <div class="compare-grid" id="compare-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- View: Insights -->
+            <section class="view" id="view-insights">
+                <div class="view__container">
+                    <div class="insights-header">
+                        <h1 class="insights-header__title">Pool Insights</h1>
+                        <button class="btn btn--ghost btn--sm" id="back-to-results-btn2">← Back to Rankings</button>
+                    </div>
+                    <div class="insights-grid" id="insights-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Detail Modal -->
+        <div class="modal-overlay" id="detail-modal">
+            <div class="modal glass-card" id="modal-content">
+                <button class="modal__close" id="modal-close">&times;</button>
+                <div class="modal__body" id="modal-body">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Container -->
+        <div class="toast-container" id="toast-container"></div>
+    </div>
+
+    <!-- Scripts (order matters) -->
+    <script type="module" src="src/data/skill-graph.js"></script>
+    <script type="module" src="src/data/candidates.js"></script>
+    <script type="module" src="src/data/job-descriptions.js"></script>
+    <script type="module" src="src/engine/nlp-utils.js"></script>
+    <script type="module" src="src/engine/skill-ontology.js"></script>
+    <script type="module" src="src/engine/jd-parser.js"></script>
+    <script type="module" src="src/engine/candidate-analyzer.js"></script>
+    <script type="module" src="src/engine/scorer.js"></script>
+    <script type="module" src="src/engine/ranker.js"></script>
+    <script type="module" src="src/ui/radar-chart.js"></script>
+    <script type="module" src="src/ui/candidate-card.js"></script>
+    <script type="module" src="src/ui/comparison-view.js"></script>
+    <script type="module" src="src/ui/detail-modal.js"></script>
+    <script type="module" src="src/ui/insights-panel.js"></script>
+    <script type="module" src="src/ui/jd-input.js"></script>
+    <script type="module" src="src/ui/app.js"></script>
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>
