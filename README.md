@@ -2,11 +2,11 @@
 
 > **Rank candidates the way a great recruiter would — not by matching keywords, but by actually understanding who fits the role.**
 
-![TalentLens Screenshot](https://raw.githubusercontent.com/hoooo-07/TalentLens/main/screenshots/rankings.png)
+![TalentLens Screenshot](https://raw.githubusercontent.com/AtifMatloob/TalentLens/master/screenshots/rankings.png)
 
 ## 🚀 Live Demo
 
-**[👉 Try TalentLens Live](https://hoooo-07.github.io/TalentLens/)**
+**[👉 Try TalentLens Live](https://AtifMatloob.github.io/TalentLens/)**
 
 ## What It Does
 
