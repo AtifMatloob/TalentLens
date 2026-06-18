@@ -8,6 +8,7 @@ import { SAMPLE_JDS } from '../data/job-descriptions.js';
 import { DEFAULT_WEIGHTS } from '../engine/scorer.js';
 
 let debounceTimer = null;
+let isParsingActive = false;
 
 /**
  * Initialize JD Input component
@@ -45,22 +46,61 @@ export function initJDInput(callbacks = {}) {
         templateDropdown.classList.remove('dropdown--open');
     });
 
-    // Text input handler with debounced parsing
+    // Text input handler with debounced async parsing
     textarea.addEventListener('input', () => {
         const text = textarea.value;
         charCount.textContent = `${text.length} characters`;
 
         // Debounce parsing
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
+        debounceTimer = setTimeout(async () => {
             if (text.length > 30) {
-                const parsed = parseJobDescription(text);
-                if (parsed) {
-                    renderParsedPreview(parsed, parsedContent);
-                    parseStatus.textContent = 'Parsed ✓';
-                    parseStatus.className = 'badge badge--success';
-                    analyzeBtn.disabled = false;
-                    callbacks.onParsed?.(parsed);
+                // Show parsing state
+                if (isParsingActive) return; // Don't stack multiple parses
+                isParsingActive = true;
+
+                parseStatus.textContent = 'Parsing...';
+                parseStatus.className = 'badge badge--warning';
+                parsedContent.innerHTML = `
+                    <div class="parsed-empty">
+                        <div class="loading-dots"><span></span><span></span><span></span></div>
+                        <p style="margin-top: 12px;">Analyzing job description...</p>
+                    </div>
+                `;
+
+                try {
+                    const parsed = await parseJobDescription(text);
+                    if (parsed) {
+                        renderParsedPreview(parsed, parsedContent);
+                        const modeLabel = parsed.parsedBy === 'llm' ? 'AI Parsed ✓' : 'Parsed ✓';
+                        parseStatus.textContent = modeLabel;
+                        parseStatus.className = 'badge badge--success';
+                        analyzeBtn.disabled = false;
+                        callbacks.onParsed?.(parsed);
+                    } else {
+                        parsedContent.innerHTML = `
+                            <div class="parsed-empty">
+                                <span class="parsed-empty__icon">⚠️</span>
+                                <p>Could not parse this text. Try adding more detail.</p>
+                            </div>
+                        `;
+                        parseStatus.textContent = 'Parse failed';
+                        parseStatus.className = 'badge badge--danger';
+                        analyzeBtn.disabled = true;
+                    }
+                } catch (error) {
+                    console.error("Parse error:", error);
+                    parsedContent.innerHTML = `
+                        <div class="parsed-empty">
+                            <span class="parsed-empty__icon">⚠️</span>
+                            <p>${error.message || 'Parsing error. Please try again.'}</p>
+                        </div>
+                    `;
+                    parseStatus.textContent = 'Error';
+                    parseStatus.className = 'badge badge--danger';
+                    analyzeBtn.disabled = true;
+                } finally {
+                    isParsingActive = false;
                 }
             } else {
                 parsedContent.innerHTML = `
@@ -73,7 +113,7 @@ export function initJDInput(callbacks = {}) {
                 parseStatus.className = 'badge badge--info';
                 analyzeBtn.disabled = true;
             }
-        }, 400);
+        }, 600);
     });
 
     // Weight sliders
@@ -95,6 +135,15 @@ export function initJDInput(callbacks = {}) {
  */
 function renderParsedPreview(parsed, container) {
     let html = '';
+
+    // Parsing mode indicator
+    const modeIcon = parsed.parsedBy === 'llm' ? '🤖' : '🧠';
+    const modeLabel = parsed.parsedBy === 'llm' ? 'AI-Powered' : 'Local NLP';
+    html += `
+        <div class="parsed-section" style="margin-bottom: 12px;">
+            <span class="badge badge--info" style="font-size: 11px;">${modeIcon} ${modeLabel}</span>
+        </div>
+    `;
 
     // Role type & seniority
     html += `
@@ -156,6 +205,18 @@ function renderParsedPreview(parsed, container) {
                 <div class="parsed-section__tags">
                     ${parsed.domainContext.map(d => `<span class="badge badge--info">${d}</span>`).join('')}
                 </div>
+            </div>
+        `;
+    }
+
+    // Responsibilities (from LLM)
+    if (parsed.responsibilities && parsed.responsibilities.length > 0) {
+        html += `
+            <div class="parsed-section">
+                <div class="parsed-section__title">Key Responsibilities</div>
+                <ul style="padding-left: 16px; font-size: var(--text-sm); color: var(--color-text-secondary);">
+                    ${parsed.responsibilities.map(r => `<li style="margin-bottom: 4px;">${r}</li>`).join('')}
+                </ul>
             </div>
         `;
     }

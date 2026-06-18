@@ -1,175 +1,227 @@
 // ============================================
 // TalentLens — Job Description Semantic Parser
-// Understands WHAT a role actually needs
+// Hybrid: LLM-powered (primary) + Local NLP (fallback)
 // ============================================
 
+import { llmClient } from './llm-api.js';
 import { extractSkillsFromText, getSkillName } from './skill-ontology.js';
-import { extractYearsOfExperience, extractEducation, detectSeniority, tokenize, removeStopWords, sentenceSplit } from './nlp-utils.js';
+import {
+    extractYearsOfExperience,
+    extractEducation,
+    detectSeniority,
+    tokenize,
+    removeStopWords
+} from './nlp-utils.js';
 
 /**
- * Parse a job description into a structured Role Requirements Model
+ * Parse a job description into a structured Role Requirements Model.
+ * Uses the LLM if an API key is configured, otherwise falls back to local NLP.
+ * Always returns a consistent structure.
  */
-export function parseJobDescription(text) {
+export async function parseJobDescription(text) {
     if (!text || text.trim().length < 20) {
         return null;
     }
 
-    const { required, niceToHave } = extractSkillsFromText(text);
-    const yearsRequired = extractYearsOfExperience(text);
-    const educationLevels = extractEducation(text);
-    const seniority = detectSeniority(text);
-    const roleType = detectRoleType(text);
-    const softSkills = detectSoftSkills(text);
-    const domainContext = detectDomainContext(text);
-    const teamContext = detectTeamContext(text);
-    const responsibilities = extractResponsibilities(text);
+    // Try LLM-powered parsing first
+    if (llmClient.hasApiKey()) {
+        try {
+            const result = await parseWithLLM(text);
+            if (result) return result;
+        } catch (error) {
+            console.warn("LLM parsing failed, falling back to local NLP:", error.message);
+        }
+    }
 
+    // Local NLP fallback
+    return parseLocally(text);
+}
+
+/**
+ * Parse JD using Gemini LLM
+ */
+async function parseWithLLM(text) {
+    const systemInstruction = `
+You are an expert technical recruiter and AI systems analyst.
+Extract structured requirements from the provided job description.
+Return ONLY valid JSON matching this schema:
+{
+  "requiredSkills": ["skill1", "skill2"],
+  "niceToHaveSkills": ["skill3"],
+  "yearsRequired": number (integer, default 0 if not specified),
+  "educationLevels": ["Bachelors", "Masters", etc],
+  "seniority": { "level": "junior|mid|senior|lead|principal|director|executive" },
+  "roleType": ["frontend", "backend", "fullstack", "mobile", "devops", "ml", "data_engineering", "management"],
+  "softSkills": {
+    "leadership": float 0.0-1.0,
+    "communication": float 0.0-1.0,
+    "autonomy": float 0.0-1.0,
+    "innovation": float 0.0-1.0,
+    "collaboration": float 0.0-1.0
+  },
+  "domainContext": ["fintech", "healthcare", "ecommerce", "saas", "startup", etc],
+  "teamContext": {
+    "teamSize": number (optional),
+    "requiresManagement": boolean,
+    "remote": boolean,
+    "hybrid": boolean,
+    "onsite": boolean
+  },
+  "responsibilities": ["resp1", "resp2"]
+}
+Limit responsibilities to max 5 bullet points.
+`;
+
+    const prompt = `Job Description:\n${text}`;
+    const parsed = await llmClient.generateContent(prompt, systemInstruction);
+
+    // Ensure defaults if missing
     return {
-        requiredSkills: required,
-        niceToHaveSkills: niceToHave,
-        yearsRequired,
-        educationLevels,
-        seniority,
-        roleType,
-        softSkills,
-        domainContext,
-        teamContext,
-        responsibilities,
-        rawText: text
+        requiredSkills: parsed.requiredSkills || [],
+        niceToHaveSkills: parsed.niceToHaveSkills || [],
+        yearsRequired: parsed.yearsRequired || 0,
+        educationLevels: parsed.educationLevels || [],
+        seniority: parsed.seniority || { level: "mid" },
+        roleType: parsed.roleType || ["general"],
+        softSkills: parsed.softSkills || {},
+        domainContext: parsed.domainContext || [],
+        teamContext: parsed.teamContext || {},
+        responsibilities: parsed.responsibilities || [],
+        rawText: text,
+        parsedBy: 'llm'
     };
 }
 
 /**
- * Detect the type of role
+ * Parse JD using local NLP utilities (no API key needed)
+ */
+function parseLocally(text) {
+    // Extract skills using the skill ontology
+    const skillResult = extractSkillsFromText(text);
+
+    // Extract years of experience
+    const yearsRequired = extractYearsOfExperience(text) || 0;
+
+    // Detect seniority
+    const seniority = detectSeniority(text);
+
+    // Extract education levels
+    const educationLevels = extractEducation(text);
+
+    // Detect role type
+    const roleType = detectRoleType(text);
+
+    // Detect domain context
+    const domainContext = detectDomainContext(text);
+
+    // Detect soft skills signals
+    const softSkills = detectSoftSkills(text);
+
+    // Detect team context
+    const teamContext = detectTeamContext(text);
+
+    return {
+        requiredSkills: skillResult.required,
+        niceToHaveSkills: skillResult.niceToHave,
+        yearsRequired,
+        educationLevels,
+        seniority: { level: seniority.level },
+        roleType,
+        softSkills,
+        domainContext,
+        teamContext,
+        responsibilities: [],
+        rawText: text,
+        parsedBy: 'local'
+    };
+}
+
+/**
+ * Detect role type from text
  */
 function detectRoleType(text) {
     const lower = text.toLowerCase();
     const types = [];
 
-    if (/full[- ]?stack|fullstack/i.test(lower)) types.push('fullstack');
-    if (/front[- ]?end|frontend|ui engineer|ui developer/i.test(lower)) types.push('frontend');
-    if (/back[- ]?end|backend|server[- ]?side|api engineer/i.test(lower)) types.push('backend');
-    if (/mobile|ios|android|react native|flutter/i.test(lower)) types.push('mobile');
-    if (/devops|sre|site reliability|platform engineer|infrastructure/i.test(lower)) types.push('devops');
-    if (/data scien|machine learn|ml engineer|ai engineer|deep learning/i.test(lower)) types.push('ml');
-    if (/data engineer|etl|data pipeline|data platform/i.test(lower)) types.push('data_engineering');
-    if (/manager|management|lead.*team|director/i.test(lower)) types.push('management');
-    if (/architect|principal|staff/i.test(lower)) types.push('architecture');
-    if (/security|infosec|cybersec/i.test(lower)) types.push('security');
-    if (/qa|test|quality assurance|sdet/i.test(lower)) types.push('qa');
-    if (/design|ux|ui\/ux/i.test(lower)) types.push('design');
+    if (/front[\s-]?end|ui\s+engineer|react|vue|angular|css/i.test(lower)) types.push('frontend');
+    if (/back[\s-]?end|server[\s-]?side|api\s+develop|django|flask|spring|express/i.test(lower)) types.push('backend');
+    if (/full[\s-]?stack|fullstack/i.test(lower)) types.push('fullstack');
+    if (/mobile|ios|android|react\s+native|flutter|swift|kotlin/i.test(lower)) types.push('mobile');
+    if (/devops|sre|site\s+reliability|infrastructure|platform\s+engineer|terraform|ci\/cd/i.test(lower)) types.push('devops');
+    if (/machine\s+learning|ml\s+engineer|data\s+scien|deep\s+learning|ai\s+engineer|nlp|computer\s+vision/i.test(lower)) types.push('ml');
+    if (/data\s+engineer|etl|data\s+pipeline|airflow|spark|big\s+data/i.test(lower)) types.push('data_engineering');
+    if (/engineering\s+manager|vp\s+of\s+eng|director\s+of\s+eng|head\s+of\s+eng|managing\s+team/i.test(lower)) types.push('management');
 
     return types.length > 0 ? types : ['general'];
 }
 
 /**
- * Detect soft skill requirements
- */
-function detectSoftSkills(text) {
-    const lower = text.toLowerCase();
-    const signals = {};
-
-    // Leadership signals
-    signals.leadership = calcSignalStrength(lower, [
-        /lead/i, /mentor/i, /drive/i, /own/i, /champion/i, /influence/i,
-        /strategic/i, /vision/i, /guide.*team/i, /grow.*team/i
-    ]);
-
-    // Communication signals
-    signals.communication = calcSignalStrength(lower, [
-        /communicat/i, /present/i, /collaborat/i, /stakeholder/i, /articulate/i,
-        /write|written/i, /document/i, /cross[- ]?functional/i
-    ]);
-
-    // Autonomy signals
-    signals.autonomy = calcSignalStrength(lower, [
-        /independent/i, /self[- ]?start/i, /autonomy|autonomous/i, /own.*end.*to.*end/i,
-        /self[- ]?direct/i, /initiative/i, /proactive/i, /ambiguity/i
-    ]);
-
-    // Innovation signals
-    signals.innovation = calcSignalStrength(lower, [
-        /innovat/i, /creative/i, /novel/i, /cutting[- ]?edge/i, /state[- ]?of[- ]?the[- ]?art/i,
-        /research/i, /experiment/i, /explore/i, /push.*boundar/i
-    ]);
-
-    // Collaboration signals
-    signals.collaboration = calcSignalStrength(lower, [
-        /team/i, /collaborat/i, /cross[- ]?functional/i, /partner/i, /work.*closely/i,
-        /agile/i, /pair/i, /code review/i
-    ]);
-
-    return signals;
-}
-
-function calcSignalStrength(text, patterns) {
-    let matches = 0;
-    for (const p of patterns) {
-        if (p.test(text)) matches++;
-    }
-    return Math.min(1.0, matches / 3);
-}
-
-/**
- * Detect domain context
+ * Detect domain context from text
  */
 function detectDomainContext(text) {
     const lower = text.toLowerCase();
     const domains = [];
 
-    if (/fintech|financial|banking|payment|trading/i.test(lower)) domains.push('fintech');
-    if (/health|medical|clinical|hipaa|patient/i.test(lower)) domains.push('healthcare');
-    if (/e-?commerce|retail|shopping|marketplace|merchant/i.test(lower)) domains.push('ecommerce');
-    if (/saas|b2b|enterprise/i.test(lower)) domains.push('saas');
-    if (/startup|early[- ]?stage|series [a-c]/i.test(lower)) domains.push('startup');
-    if (/gaming|game dev|player/i.test(lower)) domains.push('gaming');
-    if (/media|content|streaming|video/i.test(lower)) domains.push('media');
-    if (/education|edtech|learning/i.test(lower)) domains.push('education');
+    const domainPatterns = {
+        fintech: /fintech|financial|payment|banking|trading|crypto|blockchain/i,
+        healthcare: /healthcare|health\s+tech|medical|clinical|pharma|biotech/i,
+        ecommerce: /e[\s-]?commerce|retail|marketplace|shopping|merchant/i,
+        saas: /saas|b2b|subscription|platform/i,
+        startup: /startup|early[\s-]?stage|seed|series\s+[a-c]/i,
+        gaming: /gaming|game\s+dev|entertainment/i,
+        adtech: /advertising|ad\s+tech|programmatic/i,
+        edtech: /education|edtech|learning/i,
+        social: /social\s+media|social\s+network|community/i,
+        security: /cyber[\s-]?security|infosec|security/i,
+    };
+
+    for (const [domain, pattern] of Object.entries(domainPatterns)) {
+        if (pattern.test(lower)) domains.push(domain);
+    }
 
     return domains;
 }
 
 /**
- * Detect team context
+ * Detect soft skill signals from text
  */
-function detectTeamContext(text) {
+function detectSoftSkills(text) {
     const lower = text.toLowerCase();
-    const context = {};
 
-    // Team size mentions
-    const sizeMatch = lower.match(/team\s+of\s+(\d+)/i) || lower.match(/(\d+)[\s-]+(?:person|member|engineer)/i);
-    if (sizeMatch) {
-        context.teamSize = parseInt(sizeMatch[1]);
-    }
+    const measure = (patterns) => {
+        let score = 0;
+        for (const p of patterns) {
+            if (p.test(lower)) score += 0.3;
+        }
+        return Math.min(1.0, score);
+    };
 
-    // Management requirement
-    context.requiresManagement = /manag|lead.*team|hire|recruit|mentor/i.test(lower);
-    
-    // Remote/Hybrid
-    if (/remote/i.test(lower)) context.remote = true;
-    if (/hybrid/i.test(lower)) context.hybrid = true;
-    if (/on[- ]?site|in[- ]?office/i.test(lower)) context.onsite = true;
-
-    return context;
+    return {
+        leadership: measure([/leader/i, /mentor/i, /guide\s+team/i, /lead\s+team/i, /manage\s+team/i]),
+        communication: measure([/communicat/i, /present/i, /stakeholder/i, /cross[\s-]?functional/i]),
+        autonomy: measure([/self[\s-]?start/i, /independen/i, /autonomy/i, /self[\s-]?direct/i]),
+        innovation: measure([/innovat/i, /creative/i, /novel/i, /research/i, /experiment/i]),
+        collaboration: measure([/collaborat/i, /team[\s-]?work/i, /cross[\s-]?team/i, /partner/i])
+    };
 }
 
 /**
- * Extract key responsibilities
+ * Detect team context from text
  */
-function extractResponsibilities(text) {
-    const sentences = sentenceSplit(text);
-    const responsibilities = [];
+function detectTeamContext(text) {
+    const lower = text.toLowerCase();
 
-    const actionVerbs = /^(?:design|build|develop|implement|architect|lead|manage|drive|create|maintain|optimize|deploy|collaborate|work|contribute|ensure|establish|define|set|deliver|scale|write|review)/i;
+    // Team size
+    const teamMatch = lower.match(/team\s+of\s+(\d+)/i);
+    const teamSize = teamMatch ? parseInt(teamMatch[1]) : null;
 
-    for (const sentence of sentences) {
-        const trimmed = sentence.replace(/^[-•*]\s*/, '').trim();
-        if (actionVerbs.test(trimmed) && trimmed.length < 200) {
-            responsibilities.push(trimmed);
-        }
-    }
-
-    return responsibilities.slice(0, 10); // top 10
+    return {
+        teamSize,
+        requiresManagement: /manage|lead\s+a?\s*team|direct\s+report|people\s+management/i.test(lower),
+        remote: /remote|work\s+from\s+home|distributed/i.test(lower),
+        hybrid: /hybrid/i.test(lower),
+        onsite: /on[\s-]?site|in[\s-]?office|office[\s-]?based/i.test(lower)
+    };
 }
 
 /**
@@ -180,22 +232,22 @@ export function summarizeParsedJD(parsed) {
 
     const parts = [];
 
-    parts.push(`**Role Type:** ${parsed.roleType.join(', ')}`);
-    parts.push(`**Seniority:** ${parsed.seniority.level}`);
+    parts.push(`**Role Type:** ${(parsed.roleType || []).join(', ')}`);
+    parts.push(`**Seniority:** ${parsed.seniority?.level || 'Unknown'}`);
 
     if (parsed.yearsRequired) {
         parts.push(`**Experience:** ${parsed.yearsRequired}+ years`);
     }
 
-    if (parsed.requiredSkills.length > 0) {
-        parts.push(`**Required Skills:** ${parsed.requiredSkills.map(getSkillName).join(', ')}`);
+    if (parsed.requiredSkills?.length > 0) {
+        parts.push(`**Required Skills:** ${parsed.requiredSkills.join(', ')}`);
     }
 
-    if (parsed.niceToHaveSkills.length > 0) {
-        parts.push(`**Nice to Have:** ${parsed.niceToHaveSkills.map(getSkillName).join(', ')}`);
+    if (parsed.niceToHaveSkills?.length > 0) {
+        parts.push(`**Nice to Have:** ${parsed.niceToHaveSkills.join(', ')}`);
     }
 
-    if (parsed.educationLevels.length > 0) {
+    if (parsed.educationLevels?.length > 0) {
         parts.push(`**Education:** ${parsed.educationLevels.join(', ')}`);
     }
 

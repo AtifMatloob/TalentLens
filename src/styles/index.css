@@ -160,13 +160,19 @@ body {
     overflow: hidden;
     pointer-events: none;
     z-index: 0;
+    contain: strict;
+    isolation: isolate;
 }
 
 .ambient-orb {
     position: absolute;
     border-radius: 50%;
     filter: blur(120px);
-    opacity: 0.3;
+    opacity: 0.25;
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform: translateZ(0);
 }
 
 .ambient-orb--1 {

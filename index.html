@@ -54,6 +54,7 @@
                     <span class="header__nav-icon">💡</span> Insights
                 </button>
             </nav>
+            <button class="btn btn--ghost btn--sm" id="btn-api-settings">⚙️ Configure AI</button>
         </header>
 
         <!-- Main Content Area -->
@@ -195,6 +196,31 @@
             </div>
         </div>
 
+        <!-- API Settings Modal -->
+        <div class="modal-overlay" id="api-settings-modal">
+            <div class="modal modal--small">
+                <button class="modal__close" id="api-modal-close-btn">&times;</button>
+                <div class="modal__content">
+                    <h2 style="margin-bottom: var(--spacing-4);">⚙️ AI Configuration</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: var(--spacing-6); font-size: 0.9rem;">
+                        TalentLens works <strong>without an API key</strong> using local NLP. 
+                        For enhanced AI-powered parsing and scoring, add your free Google Gemini API key below.
+                    </p>
+                    <div class="form-group">
+                        <label class="form-label">Gemini API Key (Optional)</label>
+                        <input type="password" id="api-key-input" class="form-input" placeholder="AIzaSy...">
+                        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: var(--spacing-2);">
+                            Get a free key from <a href="https://aistudio.google.com/" target="_blank" style="color: var(--primary);">Google AI Studio</a>. Your key is stored securely in your browser's localStorage.
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: var(--spacing-3); margin-top: var(--spacing-6); justify-content: flex-end;">
+                        <button class="btn btn--ghost" id="api-modal-cancel">Skip</button>
+                        <button class="btn btn--primary" id="api-modal-save">Save Key</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Toast Container -->
         <div class="toast-container" id="toast-container"></div>
     </div>
@@ -205,6 +231,7 @@
     <script type="module" src="src/data/job-descriptions.js"></script>
     <script type="module" src="src/engine/nlp-utils.js"></script>
     <script type="module" src="src/engine/skill-ontology.js"></script>
+    <script type="module" src="src/engine/llm-api.js"></script>
     <script type="module" src="src/engine/jd-parser.js"></script>
     <script type="module" src="src/engine/candidate-analyzer.js"></script>
     <script type="module" src="src/engine/scorer.js"></script>
@@ -215,6 +242,7 @@
     <script type="module" src="src/ui/detail-modal.js"></script>
     <script type="module" src="src/ui/insights-panel.js"></script>
     <script type="module" src="src/ui/jd-input.js"></script>
+    <script type="module" src="src/ui/api-settings.js"></script>
     <script type="module" src="src/ui/app.js"></script>
     <script type="module" src="src/main.js"></script>
 </body>

@@ -56,8 +56,9 @@ export function renderComparisonView(container, selectedItems) {
             `;
         }).join('');
 
-        // Strengths
-        const strengthsHTML = scores.strengths.map(s =>
+        // Strengths — check both direct and nested locations
+        const strengths = scores.strengths || scores.insights?.strengths || [];
+        const strengthsHTML = strengths.map(s =>
             `<li class="compare-card__strength-item">${s}</li>`
         ).join('');
 

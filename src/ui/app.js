@@ -8,6 +8,7 @@ import { renderCandidateCard } from './candidate-card.js';
 import { renderComparisonView } from './comparison-view.js';
 import { showDetailModal, initModalHandlers } from './detail-modal.js';
 import { renderInsights } from './insights-panel.js';
+import { initApiSettings } from './api-settings.js';
 
 class TalentLensApp {
     constructor() {
@@ -23,6 +24,7 @@ class TalentLensApp {
     init() {
         // Init modal handlers
         initModalHandlers();
+        initApiSettings();
 
         // Init JD input
         initJDInput({
@@ -98,15 +100,17 @@ class TalentLensApp {
         analyzeBtn.classList.add('btn--loading');
         analyzeBtn.disabled = true;
 
-        // Simulate processing time for UX
-        await new Promise(resolve => setTimeout(resolve, 800));
-
         try {
-            // Run ranking engine
-            this.rankingResults = rankCandidates(jdText, weights);
+            // Run ranking engine (async — parses JD and scores candidates)
+            this.rankingResults = await rankCandidates(jdText, weights);
 
             if (this.rankingResults.error) {
                 this.showToast('⚠️', this.rankingResults.error);
+                return;
+            }
+
+            if (!this.rankingResults.results || this.rankingResults.results.length === 0) {
+                this.showToast('⚠️', 'No candidates could be scored. Please try a different job description.');
                 return;
             }
 
@@ -123,11 +127,13 @@ class TalentLensApp {
 
             // Show success toast
             const topCandidate = this.rankingResults.results[0];
-            this.showToast('✅', `Ranked ${this.rankingResults.results.length} candidates. Top match: ${topCandidate.candidate.name} (${topCandidate.scores.composite})`);
+            const score = topCandidate.scores.composite;
+            const aiMode = this.rankingResults.parsedJD?.parsedBy === 'llm' ? ' (AI-Enhanced)' : '';
+            this.showToast('✅', `Ranked ${this.rankingResults.results.length} candidates${aiMode}. Top match: ${topCandidate.candidate.name} (${score})`);
 
         } catch (error) {
             console.error('Analysis error:', error);
-            this.showToast('❌', 'Error during analysis. Please try again.');
+            this.showToast('❌', error.message || 'Error during analysis. Please try again.');
         } finally {
             analyzeBtn.classList.remove('btn--loading');
             analyzeBtn.disabled = false;

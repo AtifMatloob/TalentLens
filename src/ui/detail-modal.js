@@ -64,10 +64,13 @@ export function showDetailModal(rankedItem) {
         </div>
     `).join('');
 
-    // Strengths & Gaps
-    const strengthsHTML = scores.strengths.map(s => `<li>${s}</li>`).join('');
-    const gapsHTML = scores.gaps.map(g => `<li>${g}</li>`).join('');
-    const gemsHTML = (scores.hiddenGems || []).map(g => `<li>${g}</li>`).join('');
+    // Strengths & Gaps — check both direct and nested locations for compat
+    const strengths = scores.strengths || scores.insights?.strengths || [];
+    const gaps = scores.gaps || scores.insights?.gaps || [];
+    const hiddenGemsList = scores.hiddenGems || scores.insights?.hiddenGems || [];
+    const strengthsHTML = strengths.map(s => `<li>${s}</li>`).join('');
+    const gapsHTML = gaps.map(g => `<li>${g}</li>`).join('');
+    const gemsHTML = hiddenGemsList.map(g => `<li>${g}</li>`).join('');
 
     body.innerHTML = `
         <div class="detail-header">
@@ -95,17 +98,17 @@ export function showDetailModal(rankedItem) {
             <div class="detail-scores-grid">${scoreDims}</div>
         </div>
 
-        ${scores.strengths.length > 0 || scores.gaps.length > 0 ? `
+        ${strengths.length > 0 || gaps.length > 0 ? `
         <div class="detail-section">
             <div class="detail-section__title">Analysis</div>
             <div class="detail-strengths-gaps">
-                ${scores.strengths.length > 0 ? `
+                ${strengths.length > 0 ? `
                     <div>
                         <div class="detail-section__title" style="color: var(--color-accent-emerald);">✦ Strengths</div>
                         <ul class="detail-list detail-list--strengths">${strengthsHTML}</ul>
                     </div>
                 ` : ''}
-                ${scores.gaps.length > 0 ? `
+                ${gaps.length > 0 ? `
                     <div>
                         <div class="detail-section__title" style="color: var(--color-accent-amber);">△ Gaps</div>
                         <ul class="detail-list detail-list--gaps">${gapsHTML}</ul>
