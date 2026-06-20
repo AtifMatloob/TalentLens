@@ -23,16 +23,43 @@ class TalentLensApp {
         initApiSettings();
         initRecruitersView(this);
 
-        // Populate candidate selector on login page
-        this.populateLoginCandidateSelect();
+        // Populate sign-up candidate linkage options
+        this.populateSignupCandidateSelect();
+
+        // Sign In / Sign Up tab switching
+        document.getElementById('btn-toggle-signin')?.addEventListener('click', () => {
+            document.getElementById('login-signin-section').style.display = 'grid';
+            document.getElementById('login-signup-section').style.display = 'none';
+            document.getElementById('btn-toggle-signin').className = 'btn btn--primary';
+            document.getElementById('btn-toggle-signup').className = 'btn btn--ghost';
+        });
+
+        document.getElementById('btn-toggle-signup')?.addEventListener('click', () => {
+            document.getElementById('login-signin-section').style.display = 'none';
+            document.getElementById('login-signup-section').style.display = 'block';
+            document.getElementById('btn-toggle-signin').className = 'btn btn--ghost';
+            document.getElementById('btn-toggle-signup').className = 'btn btn--primary';
+        });
+
+        // SignUp Account type dropdown change
+        document.getElementById('signup-role')?.addEventListener('change', (e) => {
+            const linkageGroup = document.getElementById('signup-candidate-profile-group');
+            if (linkageGroup) {
+                linkageGroup.style.display = e.target.value === 'candidate' ? 'block' : 'none';
+            }
+        });
 
         // Portal Selector events
         document.getElementById('btn-login-org')?.addEventListener('click', () => {
-            this.loginAsRole('org');
+            this.handleUserLogin('org');
         });
         document.getElementById('btn-login-candidate')?.addEventListener('click', () => {
-            const select = document.getElementById('login-candidate-select');
-            this.loginAsRole('candidate', select?.value);
+            this.handleUserLogin('candidate');
+        });
+
+        // Execute Sign Up registration
+        document.getElementById('btn-execute-signup')?.addEventListener('click', () => {
+            this.handleUserRegistration();
         });
 
         // Logout
@@ -96,8 +123,8 @@ class TalentLensApp {
         });
     }
 
-    populateLoginCandidateSelect() {
-        const select = document.getElementById('login-candidate-select');
+    populateSignupCandidateSelect() {
+        const select = document.getElementById('signup-candidate-profile-id');
         if (!select) return;
         select.innerHTML = '';
         const candidates = candidateService.getCandidates();
@@ -121,6 +148,91 @@ class TalentLensApp {
             opt.textContent = value.name;
             select.appendChild(opt);
         });
+    }
+
+    handleUserRegistration() {
+        const role = document.getElementById('signup-role').value;
+        const username = document.getElementById('signup-username').value.trim();
+        const password = document.getElementById('signup-password').value;
+        const candidateId = document.getElementById('signup-candidate-profile-id').value;
+
+        if (!username) {
+            this.showToast('⚠️', 'Please enter a username.');
+            return;
+        }
+
+        if (password.length < 6) {
+            this.showToast('⚠️', 'Password should be minimum 6 letters / digits');
+            return;
+        }
+
+        // Virtual Storage in LocalStorage for credentials
+        let credentials = {};
+        try {
+            credentials = JSON.parse(localStorage.getItem('talentlens_virtual_creds')) || {};
+        } catch (e) {
+            credentials = {};
+        }
+
+        // Check uniqueness of username
+        if (credentials[username]) {
+            this.showToast('⚠️', 'Username is already taken. Choose a different one.');
+            return;
+        }
+
+        credentials[username] = {
+            role,
+            password,
+            candidateId: role === 'candidate' ? candidateId : null
+        };
+
+        localStorage.setItem('talentlens_virtual_creds', JSON.stringify(credentials));
+        this.showToast('✅', 'Account registered successfully! Now sign in.');
+        
+        // Clear input values
+        document.getElementById('signup-username').value = '';
+        document.getElementById('signup-password').value = '';
+
+        // Switch to signin view
+        document.getElementById('btn-toggle-signin')?.click();
+    }
+
+    handleUserLogin(role) {
+        const usernameInputId = role === 'candidate' ? 'login-cand-username' : 'login-org-username';
+        const passwordInputId = role === 'candidate' ? 'login-cand-password' : 'login-org-password';
+        
+        const username = document.getElementById(usernameInputId).value.trim();
+        const password = document.getElementById(passwordInputId).value;
+
+        if (!username) {
+            this.showToast('⚠️', 'Please enter your username.');
+            return;
+        }
+
+        if (password.length < 6) {
+            this.showToast('⚠️', 'Password should be minimum 6 letters / digits');
+            return;
+        }
+
+        // Load credentials from Virtual Storage
+        let credentials = {};
+        try {
+            credentials = JSON.parse(localStorage.getItem('talentlens_virtual_creds')) || {};
+        } catch (e) {
+            credentials = {};
+        }
+
+        const userRecord = credentials[username];
+        if (!userRecord || userRecord.role !== role || userRecord.password !== password) {
+            this.showToast('❌', 'Invalid username or password for this portal.');
+            return;
+        }
+
+        // Clear values
+        document.getElementById(usernameInputId).value = '';
+        document.getElementById(passwordInputId).value = '';
+
+        this.loginAsRole(role, userRecord.candidateId);
     }
 
     loginAsRole(role, candidateId = null) {
@@ -151,7 +263,6 @@ class TalentLensApp {
         this.activeCandidateId = null;
         document.getElementById('header').style.display = 'none';
         document.getElementById('main-nav').style.display = 'flex'; // Reset nav
-        this.populateLoginCandidateSelect(); // Refresh list in case changes were made
         this.switchView('login');
     }
 

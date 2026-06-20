@@ -25,43 +25,94 @@
         </div>
 
         <!-- Role Selector / Login Window -->
-        <section class="view view--active" id="view-login" style="padding-top: var(--space-16);">
+        <section class="view view--active" id="view-login" style="padding-top: var(--space-8); padding-bottom: var(--space-16);">
             <div class="view__container" style="max-width: 900px; margin: 0 auto; text-align: center;">
-                <div class="input-hero" style="margin-bottom: var(--space-8);">
+                <div class="input-hero" style="margin-bottom: var(--space-4);">
                     <h1 class="input-hero__title">
                         Welcome to <span class="gradient-text">TalentLens</span>
                     </h1>
                     <p class="input-hero__subtitle">
-                        AI-powered candidate intelligence system. Choose your portal to continue.
+                        AI-powered candidate intelligence system. Sign in or Register a new account.
                     </p>
                 </div>
                 
-                <div class="login-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); margin-top: var(--space-8);">
+                <div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 25px;">
+                    <button class="btn btn--primary" id="btn-toggle-signin" style="background: var(--gradient-primary);">Sign In</button>
+                    <button class="btn btn--ghost" id="btn-toggle-signup">Register / Sign Up</button>
+                </div>
+
+                <!-- Sign In Form Grid -->
+                <div class="login-grid" id="login-signin-section" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); margin-top: var(--space-2);">
                     <!-- Candidate Card -->
-                    <div class="glass-card login-card" id="login-card-candidate" style="cursor: pointer; padding: var(--space-8); text-align: center; border-radius: var(--radius-xl); transition: all 0.3s ease;">
-                        <span style="font-size: 4rem; display: block; margin-bottom: var(--space-4);">🧑‍💻</span>
-                        <h2 style="font-size: 1.5rem; margin-bottom: var(--space-2);">Login as Candidate</h2>
-                        <p style="color: var(--color-text-secondary); font-size: 0.9rem; margin-bottom: var(--space-6);">
-                            Access your profile, update your resume, add certifications, and customize your skills.
-                        </p>
-                        <div class="form-group" style="text-align: left; margin-bottom: var(--space-4);" onclick="event.stopPropagation()">
-                            <label class="form-label" style="display: block; margin-bottom: 5px; font-weight: 500;">Select Profile</label>
-                            <select id="login-candidate-select" style="width: 100%; padding: 12px; background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: white;">
-                                <!-- Candidates populated by JS -->
-                            </select>
+                    <div class="glass-card login-card" id="login-card-candidate" style="padding: var(--space-8); text-align: center; border-radius: var(--radius-xl); transition: all 0.3s ease;">
+                        <span style="font-size: 3rem; display: block; margin-bottom: var(--space-2);">🧑‍💻</span>
+                        <h2 style="font-size: 1.3rem; margin-bottom: var(--space-2);">Candidate Login</h2>
+                        
+                        <div class="form-group" style="text-align: left; margin-bottom: var(--space-3);">
+                            <label class="form-label" style="display: block; margin-bottom: 5px; font-weight: 500; font-size: 0.85rem;">Username</label>
+                            <input type="text" id="login-cand-username" placeholder="Enter username" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: white;">
                         </div>
+
+                        <div class="form-group" style="text-align: left; margin-bottom: var(--space-4);">
+                            <label class="form-label" style="display: block; margin-bottom: 5px; font-weight: 500; font-size: 0.85rem;">Password</label>
+                            <input type="password" id="login-cand-password" placeholder="Min 6 characters" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: white;">
+                            <span style="font-size: 0.75rem; color: var(--color-text-muted); display: block; margin-top: 3px;">Minimum 6 digit password</span>
+                        </div>
+
                         <button class="btn btn--primary" id="btn-login-candidate" style="width: 100%;">Enter Candidate Portal</button>
                     </div>
 
                     <!-- Organization Card -->
-                    <div class="glass-card login-card" id="login-card-org" style="cursor: pointer; padding: var(--space-8); text-align: center; border-radius: var(--radius-xl); transition: all 0.3s ease;">
-                        <span style="font-size: 4rem; display: block; margin-bottom: var(--space-4);">🏢</span>
-                        <h2 style="font-size: 1.5rem; margin-bottom: var(--space-2);">Login as Organisation</h2>
-                        <p style="color: var(--color-text-secondary); font-size: 0.9rem; margin-bottom: var(--space-6);">
-                            Rank profiles, configure AI weights, compare candidates side-by-side, and view pool insights.
-                        </p>
-                        <button class="btn btn--primary" id="btn-login-org" style="width: 100%; margin-top: 48px;">Enter Organization Portal</button>
+                    <div class="glass-card login-card" id="login-card-org" style="padding: var(--space-8); text-align: center; border-radius: var(--radius-xl); transition: all 0.3s ease;">
+                        <span style="font-size: 3rem; display: block; margin-bottom: var(--space-2);">🏢</span>
+                        <h2 style="font-size: 1.3rem; margin-bottom: var(--space-2);">Organization Login</h2>
+                        
+                        <div class="form-group" style="text-align: left; margin-bottom: var(--space-3);">
+                            <label class="form-label" style="display: block; margin-bottom: 5px; font-weight: 500; font-size: 0.85rem;">Username</label>
+                            <input type="text" id="login-org-username" placeholder="Enter organization username" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: white;">
+                        </div>
+
+                        <div class="form-group" style="text-align: left; margin-bottom: var(--space-4);">
+                            <label class="form-label" style="display: block; margin-bottom: 5px; font-weight: 500; font-size: 0.85rem;">Password</label>
+                            <input type="password" id="login-org-password" placeholder="Min 6 characters" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: white;">
+                            <span style="font-size: 0.75rem; color: var(--color-text-muted); display: block; margin-top: 3px;">Minimum 6 digit password</span>
+                        </div>
+
+                        <button class="btn btn--primary" id="btn-login-org" style="width: 100%;">Enter Organization Portal</button>
                     </div>
+                </div>
+
+                <!-- Sign Up Form (Initially Hidden) -->
+                <div class="glass-card" id="login-signup-section" style="display: none; max-width: 500px; margin: var(--space-4) auto 0; padding: var(--space-8); text-align: left; border-radius: var(--radius-xl);">
+                    <h2 style="font-size: 1.5rem; margin-bottom: var(--space-4); text-align: center;">Create New Portal Account</h2>
+                    
+                    <div class="form-group" style="margin-bottom: var(--space-3);">
+                        <label class="form-label" style="display: block; margin-bottom: 5px; font-weight: 500;">Account Type</label>
+                        <select id="signup-role" style="width: 100%; padding: 12px; background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: white;">
+                            <option value="candidate">Candidate Profile</option>
+                            <option value="org">Organization (Recruiter)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: var(--space-3);">
+                        <label class="form-label" style="display: block; margin-bottom: 5px; font-weight: 500;">Username</label>
+                        <input type="text" id="signup-username" placeholder="Pick a username" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: white;">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: var(--space-3);" id="signup-candidate-profile-group">
+                        <label class="form-label" style="display: block; margin-bottom: 5px; font-weight: 500;">Link to Candidate Profile</label>
+                        <select id="signup-candidate-profile-id" style="width: 100%; padding: 12px; background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: white;">
+                            <!-- Will list default candidate profiles -->
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: var(--space-4);">
+                        <label class="form-label" style="display: block; margin-bottom: 5px; font-weight: 500;">Password</label>
+                        <input type="password" id="signup-password" placeholder="At least 6 characters" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: white;">
+                        <span style="font-size: 0.75rem; color: var(--color-text-muted); display: block; margin-top: 3px;">Minimum 6 digit password</span>
+                    </div>
+
+                    <button class="btn btn--primary" id="btn-execute-signup" style="width: 100%;">Register Account</button>
                 </div>
             </div>
         </section>
