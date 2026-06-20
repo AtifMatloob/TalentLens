@@ -1,22 +1,18 @@
-// ============================================
-// TalentLens — Main App Controller
-// ============================================
-
-import { rankCandidates } from '../engine/ranker.js';
-import { initJDInput, getWeights } from './jd-input.js';
-import { renderCandidateCard } from './candidate-card.js';
-import { renderComparisonView } from './comparison-view.js';
-import { showDetailModal, initModalHandlers } from './detail-modal.js';
-import { renderInsights } from './insights-panel.js';
-import { initApiSettings } from './api-settings.js';
+import { candidateService } from '../data/candidate-service.js';
+import { SKILL_GRAPH } from '../data/skill-graph.js';
+import { parseCandidateResume } from '../engine/candidate-parser.js';
 
 class TalentLensApp {
     constructor() {
-        this.currentView = 'input';
+        this.currentView = 'login';
         this.rankingResults = null;
         this.parsedJD = null;
         this.compareSelection = new Map(); // candidateId -> rankedItem
         this.compareBar = null;
+        
+        this.userRole = null; // 'candidate' or 'org'
+        this.activeCandidateId = null; // selected candidate profile ID if role is 'candidate'
+        this.activeCandidateSkills = []; // currently edited skills
 
         this.init();
     }
@@ -25,6 +21,49 @@ class TalentLensApp {
         // Init modal handlers
         initModalHandlers();
         initApiSettings();
+        initRecruitersView(this);
+
+        // Populate candidate selector on login page
+        this.populateLoginCandidateSelect();
+
+        // Portal Selector events
+        document.getElementById('btn-login-org')?.addEventListener('click', () => {
+            this.loginAsRole('org');
+        });
+        document.getElementById('btn-login-candidate')?.addEventListener('click', () => {
+            const select = document.getElementById('login-candidate-select');
+            this.loginAsRole('candidate', select?.value);
+        });
+
+        // Logout
+        document.getElementById('btn-logout')?.addEventListener('click', () => {
+            this.logout();
+        });
+
+        // Candidate Portal specific handlers
+        document.getElementById('btn-cand-add-cert')?.addEventListener('click', () => {
+            this.addCandidateCertInput('');
+        });
+        document.getElementById('btn-cand-add-skill')?.addEventListener('click', () => {
+            this.addSelectedCandidateSkill();
+        });
+        document.getElementById('btn-cand-save-profile')?.addEventListener('click', () => {
+            this.saveCandidateProfile();
+        });
+
+        // Candidate Resume Fast Import
+        const candFileInput = document.getElementById('cand-resume-file-input');
+        const candUploadZone = document.getElementById('cand-resume-upload-zone');
+        candUploadZone?.addEventListener('click', () => candFileInput?.click());
+        candFileInput?.addEventListener('change', async (e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+                await this.handleCandidateResumeUpload(file);
+            }
+        });
+
+        // Populate skills dropdown in candidate portal
+        this.populateSkillsDropdown();
 
         // Init JD input
         initJDInput({
@@ -57,7 +96,239 @@ class TalentLensApp {
         });
     }
 
+    populateLoginCandidateSelect() {
+        const select = document.getElementById('login-candidate-select');
+        if (!select) return;
+        select.innerHTML = '';
+        const candidates = candidateService.getCandidates();
+        candidates.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = `${c.avatar} ${c.name} (${c.currentTitle})`;
+            select.appendChild(opt);
+        });
+    }
+
+    populateSkillsDropdown() {
+        const select = document.getElementById('cand-add-skill-select');
+        if (!select) return;
+        select.innerHTML = '';
+        // Sort skills alphabetically
+        const sortedSkills = Object.entries(SKILL_GRAPH).sort((a, b) => a[1].name.localeCompare(b[1].name));
+        sortedSkills.forEach(([key, value]) => {
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = value.name;
+            select.appendChild(opt);
+        });
+    }
+
+    loginAsRole(role, candidateId = null) {
+        this.userRole = role;
+        const header = document.getElementById('header');
+        const roleBadge = document.getElementById('portal-role-badge');
+        
+        if (role === 'org') {
+            roleBadge.textContent = 'Organization';
+            header.style.display = 'flex';
+            this.switchView('input');
+        } else if (role === 'candidate') {
+            this.activeCandidateId = candidateId;
+            roleBadge.textContent = 'Candidate';
+            header.style.display = 'flex';
+            
+            // Hide navigation buttons for Candidate
+            document.getElementById('main-nav').style.display = 'none';
+            
+            // Switch to candidate dashboard view
+            this.switchView('candidate-dashboard');
+            this.loadCandidateProfileData(candidateId);
+        }
+    }
+
+    logout() {
+        this.userRole = null;
+        this.activeCandidateId = null;
+        document.getElementById('header').style.display = 'none';
+        document.getElementById('main-nav').style.display = 'flex'; // Reset nav
+        this.populateLoginCandidateSelect(); // Refresh list in case changes were made
+        this.switchView('login');
+    }
+
+    loadCandidateProfileData(candidateId) {
+        const candidates = candidateService.getCandidates();
+        const candidate = candidates.find(c => c.id === candidateId);
+        if (!candidate) return;
+
+        document.getElementById('cand-edit-name').value = candidate.name || '';
+        document.getElementById('cand-edit-avatar').value = candidate.avatar || '🧑‍💻';
+        document.getElementById('cand-edit-title').value = candidate.currentTitle || '';
+        document.getElementById('cand-edit-company').value = candidate.currentCompany || '';
+        document.getElementById('cand-edit-location').value = candidate.location || '';
+        document.getElementById('cand-edit-exp-years').value = candidate.yearsOfExperience || 0;
+
+        document.getElementById('cand-edit-edu-degree').value = candidate.education?.degree || '';
+        document.getElementById('cand-edit-edu-school').value = candidate.education?.institution || '';
+        document.getElementById('cand-edit-edu-year').value = candidate.education?.year || new Date().getFullYear();
+
+        // Certs
+        const certsContainer = document.getElementById('cand-edit-certs-container');
+        certsContainer.innerHTML = '';
+        const certs = candidate.certifications || [];
+        certs.forEach(cert => this.addCandidateCertInput(cert));
+
+        // Skills
+        this.activeCandidateSkills = [...(candidate.skills || [])];
+        this.renderCandidateSkillsList();
+    }
+
+    addCandidateCertInput(value = '') {
+        const certsContainer = document.getElementById('cand-edit-certs-container');
+        const wrapper = document.createElement('div');
+        wrapper.style.display = 'flex';
+        wrapper.style.gap = 'var(--space-2)';
+        wrapper.className = 'cand-cert-input-wrapper';
+        wrapper.innerHTML = `
+            <input type="text" class="cand-cert-input" value="${value}" placeholder="e.g. AWS Certified Developer" style="flex: 1; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: white;">
+            <button class="btn btn--ghost btn--sm btn-delete-cert-field" style="border-color: rgba(251, 113, 133, 0.4); color: var(--color-accent-rose);">❌</button>
+        `;
+        wrapper.querySelector('.btn-delete-cert-field').addEventListener('click', () => {
+            wrapper.remove();
+        });
+        certsContainer.appendChild(wrapper);
+    }
+
+    addSelectedCandidateSkill() {
+        const select = document.getElementById('cand-add-skill-select');
+        const skillKey = select.value;
+        if (skillKey && !this.activeCandidateSkills.includes(skillKey)) {
+            this.activeCandidateSkills.push(skillKey);
+            this.renderCandidateSkillsList();
+            this.showToast('🧠', `Added skill: ${SKILL_GRAPH[skillKey]?.name || skillKey}`);
+        }
+    }
+
+    removeCandidateSkill(skillKey) {
+        this.activeCandidateSkills = this.activeCandidateSkills.filter(s => s !== skillKey);
+        this.renderCandidateSkillsList();
+    }
+
+    renderCandidateSkillsList() {
+        const container = document.getElementById('cand-edit-skills-container');
+        if (!container) return;
+        container.innerHTML = '';
+        
+        if (this.activeCandidateSkills.length === 0) {
+            container.innerHTML = `<span style="color: var(--color-text-muted); font-size: 0.85rem;">No skills selected yet.</span>`;
+            return;
+        }
+
+        this.activeCandidateSkills.forEach(skillKey => {
+            const skillName = SKILL_GRAPH[skillKey]?.name || skillKey;
+            const badge = document.createElement('span');
+            badge.className = 'badge badge--skill';
+            badge.style.display = 'inline-flex';
+            badge.style.alignItems = 'center';
+            badge.style.gap = '6px';
+            badge.style.cursor = 'pointer';
+            badge.innerHTML = `${skillName} <strong style="color: var(--color-accent-rose); margin-left: 2px;">&times;</strong>`;
+            badge.addEventListener('click', () => this.removeCandidateSkill(skillKey));
+            container.appendChild(badge);
+        });
+    }
+
+    saveCandidateProfile() {
+        const name = document.getElementById('cand-edit-name').value.trim();
+        if (!name) {
+            this.showToast('⚠️', 'Name is required');
+            return;
+        }
+
+        const certInputs = document.querySelectorAll('.cand-cert-input');
+        const certifications = Array.from(certInputs)
+            .map(input => input.value.trim())
+            .filter(Boolean);
+
+        const updatedData = {
+            name,
+            avatar: document.getElementById('cand-edit-avatar').value.trim() || '🧑‍💻',
+            currentTitle: document.getElementById('cand-edit-title').value.trim(),
+            currentCompany: document.getElementById('cand-edit-company').value.trim(),
+            location: document.getElementById('cand-edit-location').value.trim(),
+            yearsOfExperience: parseInt(document.getElementById('cand-edit-exp-years').value) || 0,
+            education: {
+                degree: document.getElementById('cand-edit-edu-degree').value.trim(),
+                institution: document.getElementById('cand-edit-edu-school').value.trim(),
+                year: parseInt(document.getElementById('cand-edit-edu-year').value) || new Date().getFullYear()
+            },
+            certifications,
+            skills: this.activeCandidateSkills
+        };
+
+        candidateService.updateCandidate(this.activeCandidateId, updatedData);
+        this.showToast('✅', 'Profile saved successfully!');
+    }
+
+    async handleCandidateResumeUpload(file) {
+        const uploadZone = document.getElementById('cand-resume-upload-zone');
+        const originalHTML = uploadZone.innerHTML;
+        uploadZone.innerHTML = `<span class="btn__loader" style="display:block; position:relative; margin: 0 auto 10px;"></span><span>Parsing Resume PDF...</span>`;
+        
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdfjsLib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+            const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+            const pdf = await loadingTask.promise;
+            let text = '';
+            
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                text += pageText + '\n';
+            }
+
+            const parsedCandidate = await parseCandidateResume(text);
+
+            // Populate Form Fields with Parsed Data
+            document.getElementById('cand-edit-name').value = parsedCandidate.name || '';
+            document.getElementById('cand-edit-avatar').value = parsedCandidate.avatar || '🧑‍💻';
+            document.getElementById('cand-edit-title').value = parsedCandidate.currentTitle || '';
+            document.getElementById('cand-edit-company').value = parsedCandidate.currentCompany || '';
+            document.getElementById('cand-edit-location').value = parsedCandidate.location || '';
+            document.getElementById('cand-edit-exp-years').value = parsedCandidate.yearsOfExperience || 0;
+
+            document.getElementById('cand-edit-edu-degree').value = parsedCandidate.education?.degree || '';
+            document.getElementById('cand-edit-edu-school').value = parsedCandidate.education?.institution || '';
+            document.getElementById('cand-edit-edu-year').value = parsedCandidate.education?.year || new Date().getFullYear();
+
+            // Certs
+            const certsContainer = document.getElementById('cand-edit-certs-container');
+            certsContainer.innerHTML = '';
+            const certs = parsedCandidate.certifications || [];
+            certs.forEach(cert => this.addCandidateCertInput(cert));
+
+            // Skills
+            this.activeCandidateSkills = [...(parsedCandidate.skills || [])];
+            this.renderCandidateSkillsList();
+
+            this.showToast('✅', 'Resume parsed! Review details and click Save.');
+        } catch (error) {
+            console.error('Error importing resume:', error);
+            this.showToast('❌', `Failed to parse resume: ${error.message}`);
+        } finally {
+            uploadZone.innerHTML = originalHTML;
+        }
+    }
+
     switchView(viewName) {
+        // Show/hide main navigation based on role
+        const mainNav = document.getElementById('main-nav');
+        if (mainNav) {
+            mainNav.style.display = this.userRole === 'candidate' ? 'none' : 'flex';
+        }
+
         // Update nav
         document.querySelectorAll('.header__nav-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.view === viewName);
@@ -90,6 +361,11 @@ class TalentLensApp {
                 this.rankingResults.insights,
                 this.rankingResults.parsedJD
             );
+        }
+
+        // Render recruiters if switching to recruiters view
+        if (viewName === 'recruiters') {
+            renderRecruiterList();
         }
     }
 

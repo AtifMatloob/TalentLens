@@ -140,14 +140,15 @@ export function showDetailModal(rankedItem) {
             <div class="detail-experience">${expHTML}</div>
         </div>
 
-        ${candidate.certifications?.length > 0 ? `
         <div class="detail-section">
-            <div class="detail-section__title">Certifications</div>
+            <div class="detail-section__title">Certifications & Credentials</div>
             <div class="detail-skills">
-                ${candidate.certifications.map(c => `<span class="badge badge--info">${c}</span>`).join('')}
+                ${candidate.certifications && candidate.certifications.length > 0 
+                  ? candidate.certifications.map(c => `<span class="badge badge--info" style="font-size: 0.85rem; padding: 6px 12px; margin-bottom: 4px;">📜 ${c}</span>`).join('') 
+                  : `<span style="color: var(--color-text-muted); font-size: 0.9rem;">No certifications added yet.</span>`
+                }
             </div>
         </div>
-        ` : ''}
 
         <div class="detail-section">
             <div class="detail-section__title">Additional Signals</div>

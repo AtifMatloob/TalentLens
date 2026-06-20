@@ -5,7 +5,7 @@
 
 import { parseJobDescription } from './jd-parser.js';
 import { scoreCandidate, DEFAULT_WEIGHTS } from './scorer.js';
-import { CANDIDATES } from '../data/candidates.js';
+import { candidateService } from '../data/candidate-service.js';
 import { llmClient } from './llm-api.js';
 
 // Re-export DEFAULT_WEIGHTS for any module that imports from ranker
@@ -31,8 +31,9 @@ export async function rankCandidates(jdText, customWeights = null) {
 
     // 2. Score all candidates using the local scorer
     const scoredCandidates = [];
+    const candidatesToRank = candidateService.getCandidates();
 
-    for (const candidate of CANDIDATES) {
+    for (const candidate of candidatesToRank) {
         const scores = scoreCandidate(candidate, parsedJD, weights);
 
         scoredCandidates.push({
