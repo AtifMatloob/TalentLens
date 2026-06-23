@@ -1691,6 +1691,13 @@
     box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.1);
 }
 
+.candidate-dashboard-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: var(--space-6);
+    margin-top: var(--space-6);
+}
+
 .cand-cert-input-wrapper input:focus {
     outline: none;
     border-color: var(--color-border-focus);
@@ -1703,3 +1710,9 @@
     color: var(--color-accent-rose);
 }
 
+@media (max-width: 760px) {
+    .login-grid,
+    .candidate-dashboard-grid {
+        grid-template-columns: 1fr !important;
+    }
+}

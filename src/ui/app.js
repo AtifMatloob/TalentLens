@@ -1,6 +1,15 @@
 import { candidateService } from '../data/candidate-service.js';
+import { authStore, validatePassword } from '../data/auth-store.js';
 import { SKILL_GRAPH } from '../data/skill-graph.js';
 import { parseCandidateResume } from '../engine/candidate-parser.js';
+import { rankCandidates } from '../engine/ranker.js';
+import { initJDInput } from './jd-input.js';
+import { initApiSettings } from './api-settings.js';
+import { initModalHandlers, showDetailModal } from './detail-modal.js';
+import { renderCandidateCard } from './candidate-card.js';
+import { renderComparisonView } from './comparison-view.js';
+import { renderInsights } from './insights-panel.js';
+import { initRecruitersView, renderRecruiterList } from './recruiters.js';
 
 class TalentLensApp {
     constructor() {
@@ -11,8 +20,10 @@ class TalentLensApp {
         this.compareBar = null;
         
         this.userRole = null; // 'candidate' or 'org'
+        this.activeUsername = null;
         this.activeCandidateId = null; // selected candidate profile ID if role is 'candidate'
         this.activeCandidateSkills = []; // currently edited skills
+        this.activeResumeText = '';
 
         this.init();
     }
@@ -22,9 +33,6 @@ class TalentLensApp {
         initModalHandlers();
         initApiSettings();
         initRecruitersView(this);
-
-        // Populate sign-up candidate linkage options
-        this.populateSignupCandidateSelect();
 
         // Sign In / Sign Up tab switching
         document.getElementById('btn-toggle-signin')?.addEventListener('click', () => {
@@ -43,9 +51,9 @@ class TalentLensApp {
 
         // SignUp Account type dropdown change
         document.getElementById('signup-role')?.addEventListener('change', (e) => {
-            const linkageGroup = document.getElementById('signup-candidate-profile-group');
-            if (linkageGroup) {
-                linkageGroup.style.display = e.target.value === 'candidate' ? 'block' : 'none';
+            const detailsGroup = document.getElementById('signup-candidate-details-group');
+            if (detailsGroup) {
+                detailsGroup.style.display = e.target.value === 'candidate' ? 'block' : 'none';
             }
         });
 
@@ -150,11 +158,12 @@ class TalentLensApp {
         });
     }
 
-    handleUserRegistration() {
+    async handleUserRegistration() {
         const role = document.getElementById('signup-role').value;
         const username = document.getElementById('signup-username').value.trim();
         const password = document.getElementById('signup-password').value;
-        const candidateId = document.getElementById('signup-candidate-profile-id').value;
+        const fullName = document.getElementById('signup-candidate-name')?.value.trim() || username;
+        const phone = document.getElementById('signup-candidate-phone')?.value.trim() || '';
 
         if (!username) {
             this.showToast('⚠️', 'Please enter a username.');
@@ -165,6 +174,43 @@ class TalentLensApp {
             this.showToast('⚠️', 'Password should be minimum 6 letters / digits');
             return;
         }
+
+        const passwordError = validatePassword(password);
+        if (passwordError) {
+            this.showToast('Warning', passwordError);
+            return;
+        }
+
+        let createdCandidateId = null;
+        try {
+            if (role === 'candidate') {
+                const candidate = candidateService.createCandidateProfileForUser(username, {
+                    name: fullName,
+                    phone
+                });
+                createdCandidateId = candidate.id;
+            }
+
+            await authStore.registerUser({
+                username,
+                password,
+                role,
+                candidateId: createdCandidateId
+            });
+
+            this.showToast('Success', 'Account registered successfully. You can sign in now.');
+            document.getElementById('signup-username').value = '';
+            document.getElementById('signup-password').value = '';
+            document.getElementById('signup-candidate-name').value = '';
+            document.getElementById('signup-candidate-phone').value = '';
+            document.getElementById('btn-toggle-signin')?.click();
+        } catch (error) {
+            if (createdCandidateId) {
+                candidateService.deleteCandidate(createdCandidateId);
+            }
+            this.showToast('Error', error.message || 'Could not register this account.');
+        }
+        return;
 
         // Virtual Storage in LocalStorage for credentials
         let credentials = {};
@@ -197,7 +243,7 @@ class TalentLensApp {
         document.getElementById('btn-toggle-signin')?.click();
     }
 
-    handleUserLogin(role) {
+    async handleUserLogin(role) {
         const usernameInputId = role === 'candidate' ? 'login-cand-username' : 'login-org-username';
         const passwordInputId = role === 'candidate' ? 'login-cand-password' : 'login-org-password';
         
@@ -213,6 +259,28 @@ class TalentLensApp {
             this.showToast('⚠️', 'Password should be minimum 6 letters / digits');
             return;
         }
+
+        const passwordError = validatePassword(password);
+        if (passwordError) {
+            this.showToast('Warning', passwordError);
+            return;
+        }
+
+        try {
+            const userRecord = await authStore.authenticate(username, password, role);
+            if (!userRecord) {
+                this.showToast('Error', 'Invalid username or password for this portal.');
+                return;
+            }
+
+            document.getElementById(usernameInputId).value = '';
+            document.getElementById(passwordInputId).value = '';
+
+            this.loginAsRole(role, userRecord.candidateId, userRecord.username);
+        } catch (error) {
+            this.showToast('Error', error.message || 'Could not sign in.');
+        }
+        return;
 
         // Load credentials from Virtual Storage
         let credentials = {};
@@ -235,8 +303,9 @@ class TalentLensApp {
         this.loginAsRole(role, userRecord.candidateId);
     }
 
-    loginAsRole(role, candidateId = null) {
+    loginAsRole(role, candidateId = null, username = null) {
         this.userRole = role;
+        this.activeUsername = username?.toLowerCase() || null;
         const header = document.getElementById('header');
         const roleBadge = document.getElementById('portal-role-badge');
         
@@ -260,18 +329,25 @@ class TalentLensApp {
 
     logout() {
         this.userRole = null;
+        this.activeUsername = null;
         this.activeCandidateId = null;
+        this.activeResumeText = '';
         document.getElementById('header').style.display = 'none';
         document.getElementById('main-nav').style.display = 'flex'; // Reset nav
         this.switchView('login');
     }
 
     loadCandidateProfileData(candidateId) {
-        const candidates = candidateService.getCandidates();
-        const candidate = candidates.find(c => c.id === candidateId);
+        const candidate = candidateService.getCandidateById(candidateId);
+        if (candidate?.ownerUsername && candidate.ownerUsername !== this.activeUsername) {
+            this.showToast('Error', 'You can only access your own candidate profile.');
+            this.logout();
+            return;
+        }
         if (!candidate) return;
 
         document.getElementById('cand-edit-name').value = candidate.name || '';
+        document.getElementById('cand-edit-phone').value = candidate.phone || '';
         document.getElementById('cand-edit-avatar').value = candidate.avatar || '🧑‍💻';
         document.getElementById('cand-edit-title').value = candidate.currentTitle || '';
         document.getElementById('cand-edit-company').value = candidate.currentCompany || '';
@@ -290,6 +366,8 @@ class TalentLensApp {
 
         // Skills
         this.activeCandidateSkills = [...(candidate.skills || [])];
+        this.activeResumeText = candidate.resumeText || '';
+        document.getElementById('cand-edit-resume-text').value = this.activeResumeText;
         this.renderCandidateSkillsList();
     }
 
@@ -363,6 +441,7 @@ class TalentLensApp {
         const updatedData = {
             name,
             avatar: document.getElementById('cand-edit-avatar').value.trim() || '🧑‍💻',
+            phone: document.getElementById('cand-edit-phone').value.trim(),
             currentTitle: document.getElementById('cand-edit-title').value.trim(),
             currentCompany: document.getElementById('cand-edit-company').value.trim(),
             location: document.getElementById('cand-edit-location').value.trim(),
@@ -373,11 +452,17 @@ class TalentLensApp {
                 year: parseInt(document.getElementById('cand-edit-edu-year').value) || new Date().getFullYear()
             },
             certifications,
-            skills: this.activeCandidateSkills
+            skills: this.activeCandidateSkills,
+            resumeText: document.getElementById('cand-edit-resume-text').value.trim(),
+            resumeUpdatedAt: new Date().toISOString()
         };
 
-        candidateService.updateCandidate(this.activeCandidateId, updatedData);
-        this.showToast('✅', 'Profile saved successfully!');
+        const saved = candidateService.updateCandidateForOwner(this.activeCandidateId, this.activeUsername, updatedData);
+        if (!saved) {
+            this.showToast('Error', 'You can only update your own profile and resume.');
+            return;
+        }
+        this.showToast('Success', 'Profile and resume saved successfully.');
     }
 
     async handleCandidateResumeUpload(file) {
@@ -401,10 +486,12 @@ class TalentLensApp {
             }
 
             const parsedCandidate = await parseCandidateResume(text);
+            this.activeResumeText = text;
 
             // Populate Form Fields with Parsed Data
             document.getElementById('cand-edit-name').value = parsedCandidate.name || '';
             document.getElementById('cand-edit-avatar').value = parsedCandidate.avatar || '🧑‍💻';
+            document.getElementById('cand-edit-phone').value = parsedCandidate.phone || document.getElementById('cand-edit-phone').value || '';
             document.getElementById('cand-edit-title').value = parsedCandidate.currentTitle || '';
             document.getElementById('cand-edit-company').value = parsedCandidate.currentCompany || '';
             document.getElementById('cand-edit-location').value = parsedCandidate.location || '';
@@ -422,6 +509,7 @@ class TalentLensApp {
 
             // Skills
             this.activeCandidateSkills = [...(parsedCandidate.skills || [])];
+            document.getElementById('cand-edit-resume-text').value = text;
             this.renderCandidateSkillsList();
 
             this.showToast('✅', 'Resume parsed! Review details and click Save.');
@@ -434,6 +522,16 @@ class TalentLensApp {
     }
 
     switchView(viewName) {
+        if (!this.userRole && viewName !== 'login') {
+            viewName = 'login';
+        }
+        if (this.userRole === 'candidate' && viewName !== 'candidate-dashboard') {
+            viewName = 'candidate-dashboard';
+        }
+        if (this.userRole === 'org' && viewName === 'candidate-dashboard') {
+            viewName = 'input';
+        }
+
         // Show/hide main navigation based on role
         const mainNav = document.getElementById('main-nav');
         if (mainNav) {

@@ -32,6 +32,7 @@ Extract structured candidate details from the provided resume text.
 Return ONLY valid JSON matching this schema:
 {
   "name": "string (candidate full name)",
+  "phone": "string (candidate phone number)",
   "currentTitle": "string (current professional title)",
   "currentCompany": "string (current company)",
   "location": "string (e.g. San Francisco, CA or Remote)",
@@ -84,6 +85,7 @@ The return output MUST be valid JSON.
     // Provide default values if missing
     return {
         name: parsed.name || 'Parsed Candidate',
+        phone: parsed.phone || '',
         avatar: parsed.avatar || (Math.random() > 0.5 ? '👩‍💻' : '👨‍💻'),
         currentTitle: parsed.currentTitle || 'Software Engineer',
         currentCompany: parsed.currentCompany || 'SaaS Company',
@@ -114,6 +116,9 @@ function parseLocally(text) {
     if (lines.length > 0 && lines[0].length < 35 && !/resume|cv|profile|contact|curriculum/i.test(lines[0])) {
         name = lines[0];
     }
+
+    const phoneMatch = text.match(/(?:\+?\d[\d\s().-]{7,}\d)/);
+    const phone = phoneMatch ? phoneMatch[0].trim() : '';
 
     // Role title
     let currentTitle = 'Software Engineer';
@@ -222,6 +227,7 @@ function parseLocally(text) {
 
     return {
         name,
+        phone,
         avatar: Math.random() > 0.5 ? '👩‍💻' : '👨‍💻',
         currentTitle,
         currentCompany,

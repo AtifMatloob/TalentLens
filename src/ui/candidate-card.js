@@ -56,6 +56,7 @@ export function renderCandidateCard(rankedItem, callbacks = {}) {
             <div class="candidate-card__title">${candidate.currentTitle} at ${candidate.currentCompany}</div>
             <div class="candidate-card__meta">
                 <span class="candidate-card__meta-item">📍 ${candidate.location}</span>
+                ${candidate.phone ? `<span class="candidate-card__meta-item">Phone ${candidate.phone}</span>` : ''}
                 <span class="candidate-card__meta-item">💼 ${candidate.yearsOfExperience} years</span>
                 <span class="candidate-card__meta-item">🎓 ${candidate.education?.institution || 'N/A'}</span>
             </div>

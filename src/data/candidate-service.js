@@ -118,6 +118,55 @@ class CandidateService {
         return [...modifiedDefaultsList, ...recruiterCustom];
     }
 
+    getCandidateById(id) {
+        const defaultCandidate = CANDIDATES.find(c => c.id === id);
+        if (defaultCandidate) {
+            return {
+                ...defaultCandidate,
+                ...(this.modifiedDefaults[id] || {})
+            };
+        }
+
+        return this.customCandidates.find(c => c.id === id) || null;
+    }
+
+    createCandidateProfileForUser(username, profileData = {}) {
+        const id = `candidate_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const candidate = {
+            id,
+            ownerUsername: username.trim().toLowerCase(),
+            uploadedBy: 'candidate_self',
+            uploadedAt: new Date().toISOString(),
+            name: profileData.name || username,
+            phone: profileData.phone || '',
+            resumeText: '',
+            avatar: '🧑‍💻',
+            currentTitle: 'Candidate',
+            currentCompany: '',
+            location: '',
+            yearsOfExperience: 0,
+            education: { degree: '', institution: '', year: new Date().getFullYear() },
+            skills: [],
+            experience: [],
+            certifications: [],
+            openSourceContributions: 0,
+            publications: 0,
+            teamSizeManaged: 0,
+            behavioralSignals: {
+                leadership: 0.5,
+                autonomy: 0.5,
+                collaboration: 0.5,
+                mentoring: 0.5,
+                innovation: 0.5
+            },
+            ...profileData
+        };
+
+        this.customCandidates.push(candidate);
+        localStorage.setItem(this.storageKeyCandidates, JSON.stringify(this.customCandidates));
+        return candidate;
+    }
+
     addCandidate(candidateData) {
         const candidate = {
             ...candidateData,
@@ -154,6 +203,14 @@ class CandidateService {
             return this.customCandidates[index];
         }
         return null;
+    }
+
+    updateCandidateForOwner(id, ownerUsername, updatedData) {
+        const candidate = this.getCandidateById(id);
+        if (!candidate || candidate.ownerUsername !== ownerUsername.trim().toLowerCase()) {
+            return null;
+        }
+        return this.updateCandidate(id, updatedData);
     }
 
     deleteCandidate(id) {

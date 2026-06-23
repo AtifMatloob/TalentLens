@@ -99,17 +99,21 @@
                         <input type="text" id="signup-username" placeholder="Pick a username" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: white;">
                     </div>
 
-                    <div class="form-group" style="margin-bottom: var(--space-3);" id="signup-candidate-profile-group">
-                        <label class="form-label" style="display: block; margin-bottom: 5px; font-weight: 500;">Link to Candidate Profile</label>
-                        <select id="signup-candidate-profile-id" style="width: 100%; padding: 12px; background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: white;">
-                            <!-- Will list default candidate profiles -->
-                        </select>
+                    <div id="signup-candidate-details-group">
+                        <div class="form-group" style="margin-bottom: var(--space-3);">
+                            <label class="form-label" style="display: block; margin-bottom: 5px; font-weight: 500;">Full Name</label>
+                            <input type="text" id="signup-candidate-name" placeholder="Your full name" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: white;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: var(--space-3);">
+                            <label class="form-label" style="display: block; margin-bottom: 5px; font-weight: 500;">Phone Number</label>
+                            <input type="tel" id="signup-candidate-phone" placeholder="Your phone number" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: white;">
+                        </div>
                     </div>
 
                     <div class="form-group" style="margin-bottom: var(--space-4);">
                         <label class="form-label" style="display: block; margin-bottom: 5px; font-weight: 500;">Password</label>
                         <input type="password" id="signup-password" placeholder="At least 6 characters" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: white;">
-                        <span style="font-size: 0.75rem; color: var(--color-text-muted); display: block; margin-top: 3px;">Minimum 6 digit password</span>
+                        <span style="font-size: 0.75rem; color: var(--color-text-muted); display: block; margin-top: 3px;">At least 6 characters with letters, numbers, and a symbol.</span>
                     </div>
 
                     <button class="btn btn--primary" id="btn-execute-signup" style="width: 100%;">Register Account</button>
@@ -162,7 +166,7 @@
         <!-- Main Content Area -->
         <main class="main" id="main-content">
             <!-- View: JD Input -->
-            <section class="view view--active" id="view-input">
+            <section class="view" id="view-input">
                 <div class="view__container">
                     <div class="input-hero">
                         <h1 class="input-hero__title">
@@ -297,7 +301,7 @@
                         </div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: var(--space-6); margin-top: var(--space-6);">
+                    <div class="candidate-dashboard-grid">
                         <!-- Left Side: Profile Edit Form -->
                         <div class="glass-card" style="display: flex; flex-direction: column; gap: var(--space-5);">
                             <h2 style="font-size: 1.3rem; border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-2); margin-bottom: var(--space-2);">📝 Basic Details</h2>
@@ -311,6 +315,11 @@
                                     <label class="form-label" style="display: block; margin-bottom: 5px; font-weight: 500;">Avatar (Emoji)</label>
                                     <input type="text" id="cand-edit-avatar" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: white;">
                                 </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" style="display: block; margin-bottom: 5px; font-weight: 500;">Phone Number</label>
+                                <input type="tel" id="cand-edit-phone" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: white;">
                             </div>
 
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
@@ -358,6 +367,9 @@
                             <div id="cand-edit-certs-container" style="display: flex; flex-direction: column; gap: var(--space-3);">
                                 <!-- Populated dynamically -->
                             </div>
+
+                            <h2 style="font-size: 1.3rem; border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-2); margin-bottom: var(--space-2); margin-top: var(--space-4);">Resume Text</h2>
+                            <textarea id="cand-edit-resume-text" rows="8" placeholder="Upload a resume PDF or paste/update your resume text here." style="width: 100%; padding: 12px; background: rgba(0,0,0,0.2); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: white; resize: vertical; font-family: var(--font-sans);"></textarea>
 
                             <button class="btn btn--primary btn--lg" id="btn-cand-save-profile" style="margin-top: var(--space-4); width: 100%;">💾 Save Profile Changes</button>
                         </div>

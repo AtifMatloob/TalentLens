@@ -34,10 +34,5 @@ export function initApiSettings() {
         }
     });
 
-    // Check if key is configured on startup, if not show modal
-    setTimeout(() => {
-        if (!llmClient.hasApiKey()) {
-            openModal();
-        }
-    }, 500);
+    // The modal opens only from the header button so it never blocks login.
 }

@@ -80,6 +80,7 @@ export function showDetailModal(rankedItem) {
                 <div class="detail-header__title">${candidate.currentTitle} at ${candidate.currentCompany}</div>
                 <div class="detail-header__meta">
                     <span>📍 ${candidate.location}</span>
+                    ${candidate.phone ? `<span>Phone ${candidate.phone}</span>` : ''}
                     <span>💼 ${candidate.yearsOfExperience} years</span>
                     <span>🎓 ${candidate.education?.degree || 'N/A'}</span>
                     <span>🏫 ${candidate.education?.institution || 'N/A'}</span>
